@@ -1,0 +1,124 @@
+"""
+mne-python module data types
+1) Raw
+2) Epochs
+3) Evoked
+4) SourceEstimate
+
+mne-python data structure are always based on FIF file format, from neuromag,
+but there are readerfunctions for a wide variety of other data formats.
+
+the mne-python has also interfaced with wide variety of publicly available datasets,
+which MNE-python can download and manage.
+"""
+
+import numpy as numpy
+import mne
+import matplotlib.pyplot as plt
+
+sample_data_folder = mne.datasets.sample.data_path() # loading the database
+
+
+sample_data_raw_file = (
+    sample_data_folder/"MEG"/"sample"/"sample_audvis_filt-0-40_raw.fif"
+) # loading the proper dataset.
+
+raw = mne.io.read_raw_fif(sample_data_raw_file)
+
+
+"""
+The output discription : 
+
+SSP Projector, the SSP refers to Signal Space projection,which is a mathematical operation
+specifically linear operation, which is applied spatialy to the EEG or MEG signals.
+the SSP is used interchangeably, It essentially means transforming the data in a way 
+that certain patterns or components can be isolated or removed.
+
+in this particular file, there are 4 projectors, where 3 are mathematically calculated to 
+remove the environmental noise from the MEG signals. and an other projector to mean-reference
+the EEG electrodes.
+"""
+
+print("\n",raw)
+print("\n",raw.info)
+
+print("\n\n")
+
+raw.compute_psd(fmax=50).plot(picks="data", exclude = "bads")
+raw.plot(duration=5, n_channels=30)
+
+# data pre-processing
+
+"""
+MNE-Python supports a variety of preprocessing approaches and techniques 
+maxwell filtering, signal-space projection, independent components analysis,
+filtering, downsampling, etc.
+
+Here we will clean up our data by performing independent components analysis
+"""
+
+print("\n\n")
+
+# set up and fit the ICA
+
+ica = mne.preprocessing.ICA(n_components=20, random_state=97, max_iter=800)
+ica.fit(raw)
+ica.exclude = [1, 2]  
+ica.plot_properties(raw, picks=ica.exclude)
+
+orig_raw = raw.copy()
+raw.load_data()
+ica.apply(raw)
+
+print("\n\n")
+
+# show some frontal channels to clearly illustrate the artifact removal
+chs = [
+    "MEG 0111",
+    "MEG 0121",
+    "MEG 0131",
+    "MEG 0211",
+    "MEG 0221",
+    "MEG 0231",
+    "MEG 0311",
+    "MEG 0321",
+    "MEG 0331",
+    "MEG 1511",
+    "MEG 1521",
+    "MEG 1531",
+    "EEG 001",
+    "EEG 002",
+    "EEG 003",
+    "EEG 004",
+    "EEG 005",
+    "EEG 006",
+    "EEG 007",
+    "EEG 008",
+]
+chan_idxs = [raw.ch_names.index(ch) for ch in chs]
+orig_raw.plot(order=chan_idxs, start=12, duration=4)
+raw.plot(order=chan_idxs, start=12, duration=4)
+
+print("\n\n")
+
+events = mne.find_events(raw, stim_channel="STI 014")
+print(events[:5])  
+
+print("\n\n")
+
+event_dict = {
+    "auditory/left": 1,
+    "auditory/right": 2,
+    "visual/left": 3,
+    "visual/right": 4,
+    "smiley": 5,
+    "buttonpress": 32,
+}
+
+fig = mne.viz.plot_events(
+    events, event_id=event_dict, sfreq=raw.info["sfreq"], first_samp=raw.first_samp
+)
+
+plt.show()
+
+print("Successful termination.")
